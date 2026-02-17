@@ -31,8 +31,8 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(frontendPath));
 
   // Handle SPA routing - serve index.html for non-API routes
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api")) {
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api")) {
       return next();
     }
     res.sendFile(path.join(frontendPath, "index.html"));
