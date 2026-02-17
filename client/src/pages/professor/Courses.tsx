@@ -141,6 +141,16 @@ export default function Courses() {
     setTypesDetail(data.requestTypes || []);
   }
 
+  async function moveType(index: number, direction: -1 | 1) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= typesDetail.length) return;
+    const reordered = [...typesDetail];
+    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    setTypesDetail(reordered);
+    const orderedIds = reordered.map((t) => t.id);
+    await api.put(`/courses/${managingTypesId}/request-types/reorder`, { orderedIds });
+  }
+
   async function duplicateCourse(courseId: string) {
     try {
       await api.post(`/courses/${courseId}/duplicate`);
@@ -410,12 +420,32 @@ export default function Courses() {
             )}
 
             <div className="mt-4 space-y-2">
-              {typesDetail.map((t) => (
+              {typesDetail.map((t, i) => (
                 <div
                   key={t.id}
-                  className="flex items-center justify-between rounded border border-gray-100 px-3 py-2"
+                  className="flex items-center gap-2 rounded border border-gray-100 px-3 py-2"
                 >
-                  <div>
+                  <div className="flex flex-col">
+                    <button
+                      onClick={() => moveType(i, -1)}
+                      disabled={i === 0}
+                      className="text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:hover:text-gray-400"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => moveType(i, 1)}
+                      disabled={i === typesDetail.length - 1}
+                      className="text-gray-400 hover:text-gray-700 disabled:opacity-20 disabled:hover:text-gray-400"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="flex-1">
                     <p className={`text-sm font-medium ${t.active ? "text-gray-900" : "text-gray-400 line-through"}`}>
                       {t.name}
                     </p>

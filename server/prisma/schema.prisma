@@ -68,6 +68,7 @@ model RequestType {
   name               String
   acceptsAttachments Boolean  @default(false)
   active             Boolean  @default(true)
+  sortOrder          Int      @default(0)
   course             Course   @relation(fields: [courseId], references: [id])
   courseId            String
   requests           Request[]

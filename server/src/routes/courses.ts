@@ -29,7 +29,7 @@ router.get("/lookup/:code", async (req: Request, res: Response) => {
       requestTypes: {
         where: { active: true },
         select: { id: true, name: true, acceptsAttachments: true },
-        orderBy: { createdAt: "asc" },
+        orderBy: { sortOrder: "asc" },
       },
     },
   });
@@ -144,7 +144,7 @@ router.get("/:id", authenticate, async (req: AuthRequest, res: Response) => {
         include: { user: { select: { id: true, name: true, email: true, role: true } } },
       },
       requestTypes: {
-        orderBy: { createdAt: "asc" },
+        orderBy: { sortOrder: "asc" },
         select: { id: true, name: true, acceptsAttachments: true, active: true },
       },
       _count: { select: { requests: true } },
@@ -327,6 +327,7 @@ router.post(
             name: rt.name,
             acceptsAttachments: rt.acceptsAttachments,
             active: rt.active,
+            sortOrder: rt.sortOrder,
           })),
         },
         members: {
@@ -369,11 +370,18 @@ router.post(
       return;
     }
 
+    const maxOrder = await prisma.requestType.aggregate({
+      where: { courseId },
+      _max: { sortOrder: true },
+    });
+    const nextOrder = (maxOrder._max.sortOrder ?? -1) + 1;
+
     const requestType = await prisma.requestType.create({
       data: {
         name: name.trim(),
         acceptsAttachments: acceptsAttachments ?? false,
         courseId,
+        sortOrder: nextOrder,
       },
     });
 
@@ -415,6 +423,49 @@ router.patch(
     const updated = await prisma.requestType.update({
       where: { id: typeId },
       data,
+    });
+
+    res.json(updated);
+  }
+);
+
+// Protected: reorder request types for a course (owner or admin only)
+router.put(
+  "/:id/request-types/reorder",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    const courseId = req.params.id as string;
+    const { orderedIds } = req.body;
+
+    if (!Array.isArray(orderedIds)) {
+      res.status(400).json({ error: "orderedIds array is required" });
+      return;
+    }
+
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) {
+      res.status(404).json({ error: "Course not found" });
+      return;
+    }
+
+    if (course.ownerId !== req.user!.id && req.user!.role !== "ADMIN") {
+      res.status(403).json({ error: "Only the course owner can manage request types" });
+      return;
+    }
+
+    await Promise.all(
+      orderedIds.map((id: string, index: number) =>
+        prisma.requestType.updateMany({
+          where: { id, courseId },
+          data: { sortOrder: index },
+        })
+      )
+    );
+
+    const updated = await prisma.requestType.findMany({
+      where: { courseId },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, name: true, acceptsAttachments: true, active: true, sortOrder: true },
     });
 
     res.json(updated);
