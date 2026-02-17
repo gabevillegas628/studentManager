@@ -62,7 +62,7 @@ export default function ClassSubmit() {
   });
 
   // Status check state
-  const [lookupName, setLookupName] = useState("");
+  const [lookupEmail, setLookupEmail] = useState("");
   const [statusResults, setStatusResults] = useState<StatusResult[]>([]);
   const [statusError, setStatusError] = useState("");
   const [statusLoaded, setStatusLoaded] = useState(false);
@@ -105,7 +105,7 @@ export default function ClassSubmit() {
     try {
       const params = new URLSearchParams({
         courseId: course!.id,
-        studentName: lookupName,
+        studentEmail: lookupEmail,
       });
       const { data } = await api.get(`/requests/lookup?${params}`);
       setStatusResults(data);
@@ -190,7 +190,7 @@ export default function ClassSubmit() {
             onClick={() => {
               setSubmitted(null);
               setMode("status");
-              setLookupName(form.studentName);
+              setLookupEmail(form.studentEmail);
             }}
             className="mt-4 inline-block text-sm font-medium text-gray-900 underline underline-offset-4 hover:text-gray-600"
           >
@@ -318,14 +318,15 @@ export default function ClassSubmit() {
       {mode === "status" && (
         <div>
           <p className="text-sm text-gray-500">
-            Enter your name to see your submitted requests for this course.
+            Enter your email to see your submitted requests for this course.
           </p>
 
           <form onSubmit={handleStatusCheck} className="mt-4 flex gap-3">
             <input
-              value={lookupName}
-              onChange={(e) => setLookupName(e.target.value)}
-              placeholder="Your name"
+              type="email"
+              value={lookupEmail}
+              onChange={(e) => setLookupEmail(e.target.value)}
+              placeholder="Your email"
               required
               className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
             />
@@ -345,7 +346,7 @@ export default function ClassSubmit() {
 
           {statusLoaded && statusResults.length === 0 && (
             <p className="mt-6 text-center text-sm text-gray-400">
-              No requests found for that name.
+              No requests found for that email.
             </p>
           )}
 

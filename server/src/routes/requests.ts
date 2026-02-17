@@ -39,20 +39,20 @@ router.post("/", async (req: Request, res: Response) => {
   res.status(201).json({ id: request.id, status: request.status });
 });
 
-// Public: student looks up their requests by name + course
+// Public: student looks up their requests by email + course
 router.get("/lookup", async (req: Request, res: Response) => {
-  const { courseId, studentName } = req.query;
+  const { courseId, studentEmail } = req.query;
 
-  if (!courseId || !studentName) {
-    res.status(400).json({ error: "courseId and studentName are required" });
+  if (!courseId || !studentEmail) {
+    res.status(400).json({ error: "courseId and studentEmail are required" });
     return;
   }
 
   const requests = await prisma.request.findMany({
     where: {
       courseId: courseId as string,
-      studentName: {
-        equals: studentName as string,
+      studentEmail: {
+        equals: studentEmail as string,
         mode: "insensitive",
       },
     },
