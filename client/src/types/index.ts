@@ -1,12 +1,5 @@
 export type Role = "ADMIN" | "PROFESSOR" | "TA";
 
-export type RequestType =
-  | "EXAM_MAKEUP"
-  | "ABSENCE"
-  | "GRADING_DISCREPANCY"
-  | "MISSED_ASSIGNMENT"
-  | "OTHER";
-
 export type RequestStatus = "PENDING" | "IN_REVIEW" | "APPROVED" | "DENIED";
 
 export interface User {
@@ -16,15 +9,44 @@ export interface User {
   role: Role;
 }
 
+export interface RequestType {
+  id: string;
+  name: string;
+  acceptsAttachments: boolean;
+  active: boolean;
+  courseId: string;
+}
+
+export interface Course {
+  id: string;
+  name: string;
+  code: string;
+  slug: string | null;
+  active: boolean;
+  owner: { id: string; name: string };
+  _count?: { requests: number; members: number };
+  members?: CourseMember[];
+  requestTypes?: RequestType[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourseMember {
+  id: string;
+  courseId: string;
+  userId: string;
+  user: { id: string; name: string; email: string; role: Role };
+}
+
 export interface StudentRequest {
   id: string;
-  type: RequestType;
+  requestType: { id: string; name: string };
   studentName: string;
   studentEmail: string;
-  courseName: string;
   subject: string;
   description: string;
   status: RequestStatus;
+  course: { id: string; name: string; code: string };
   assignedTo?: { id: string; name: string } | null;
   comments?: Comment[];
   createdAt: string;

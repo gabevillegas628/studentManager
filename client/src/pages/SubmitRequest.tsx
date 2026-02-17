@@ -1,131 +1,45 @@
-import { useState, FormEvent } from "react";
-import { Link } from "react-router-dom";
-import api from "../api/client";
-import type { RequestType } from "../types";
-
-const REQUEST_TYPES: { value: RequestType; label: string }[] = [
-  { value: "EXAM_MAKEUP", label: "Exam Makeup" },
-  { value: "ABSENCE", label: "Absence" },
-  { value: "GRADING_DISCREPANCY", label: "Grading Discrepancy" },
-  { value: "MISSED_ASSIGNMENT", label: "Missed Assignment" },
-  { value: "OTHER", label: "Other" },
-];
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function SubmitRequest() {
-  const [submitted, setSubmitted] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const [code, setCode] = useState("");
 
-  const [form, setForm] = useState({
-    type: "EXAM_MAKEUP" as RequestType,
-    studentName: "",
-    studentEmail: "",
-    courseName: "",
-    subject: "",
-    description: "",
-  });
-
-  function updateField(field: string, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
-    try {
-      const { data } = await api.post("/requests", form);
-      setSubmitted(data.id);
-    } catch {
-      setError("Failed to submit request. Please try again.");
+    if (code.trim()) {
+      navigate(`/c/${code.trim()}`);
     }
   }
 
-  if (submitted) {
-    return (
-      <div className="page">
-        <h1>Request Submitted!</h1>
-        <p>Your request has been submitted successfully.</p>
-        <p>
-          Your tracking ID: <strong>{submitted}</strong>
-        </p>
-        <p>Save this ID to check the status of your request later.</p>
-        <Link to={`/status/${submitted}`}>Check Status</Link>
-      </div>
-    );
-  }
-
   return (
-    <div className="page">
-      <h1>Submit a Request</h1>
-      <p>
-        Already submitted?{" "}
-        <Link to="/status">Check your request status</Link>
+    <div className="mx-auto max-w-lg px-6 pt-16 text-center">
+      <h1 className="text-2xl font-semibold text-gray-900">
+        Student Request Manager
+      </h1>
+      <p className="mt-2 text-sm text-gray-500">
+        Enter your class code to submit a request to your professor.
       </p>
-      <form onSubmit={handleSubmit}>
-        {error && <p className="error">{error}</p>}
 
-        <label>
-          Request Type
-          <select
-            value={form.type}
-            onChange={(e) => updateField("type", e.target.value)}
-          >
-            {REQUEST_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Your Name
-          <input
-            value={form.studentName}
-            onChange={(e) => updateField("studentName", e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Your Email
-          <input
-            type="email"
-            value={form.studentEmail}
-            onChange={(e) => updateField("studentEmail", e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Course Name
-          <input
-            value={form.courseName}
-            onChange={(e) => updateField("courseName", e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Subject
-          <input
-            value={form.subject}
-            onChange={(e) => updateField("subject", e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Description
-          <textarea
-            rows={5}
-            value={form.description}
-            onChange={(e) => updateField("description", e.target.value)}
-            required
-          />
-        </label>
-
-        <button type="submit">Submit Request</button>
+      <form onSubmit={handleSubmit} className="mx-auto mt-8 flex max-w-xs gap-3">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Class code or slug"
+          required
+          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+        />
+        <button
+          type="submit"
+          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+        >
+          Go
+        </button>
       </form>
+
+      <p className="mt-6 text-sm text-gray-400">
+        Already submitted? Enter your class code above to check your request status.
+      </p>
     </div>
   );
 }

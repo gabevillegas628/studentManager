@@ -12,11 +12,22 @@ router.get(
   "/",
   authenticate,
   requireRole("ADMIN"),
-  async (_req: AuthRequest, res: Response) => {
-    const users = await prisma.user.findMany({
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
-    });
-    res.json(users);
+  async (req: AuthRequest, res: Response) => {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        select: { id: true, email: true, name: true, role: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.user.count(),
+    ]);
+
+    res.json({ data: users, total, page, totalPages: Math.ceil(total / limit) });
   }
 );
 

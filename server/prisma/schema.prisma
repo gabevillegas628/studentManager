@@ -13,14 +13,6 @@ enum Role {
   TA
 }
 
-enum RequestType {
-  EXAM_MAKEUP
-  ABSENCE
-  GRADING_DISCREPANCY
-  MISSED_ASSIGNMENT
-  OTHER
-}
-
 enum RequestStatus {
   PENDING
   IN_REVIEW
@@ -29,27 +21,71 @@ enum RequestStatus {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
+  id        String   @id @default(uuid())
+  email     String   @unique
   password  String
   name      String
   role      Role
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  ownedCourses     Course[]
+  courseMemberships CourseMember[]
   assignedRequests Request[]
   comments         Comment[]
 }
 
+model Course {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  slug      String?  @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   User   @relation(fields: [ownerId], references: [id])
+  ownerId String
+
+  members      CourseMember[]
+  requests     Request[]
+  requestTypes RequestType[]
+}
+
+model CourseMember {
+  id       String @id @default(uuid())
+  courseId  String
+  userId   String
+
+  course Course @relation(fields: [courseId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([courseId, userId])
+}
+
+model RequestType {
+  id                 String   @id @default(uuid())
+  name               String
+  acceptsAttachments Boolean  @default(false)
+  active             Boolean  @default(true)
+  course             Course   @relation(fields: [courseId], references: [id])
+  courseId            String
+  requests           Request[]
+  createdAt          DateTime @default(now())
+}
+
 model Request {
   id           String        @id @default(uuid())
-  type         RequestType
+  requestType  RequestType   @relation(fields: [requestTypeId], references: [id])
+  requestTypeId String
   studentName  String
   studentEmail String
-  courseName   String
   subject      String
   description  String
   status       RequestStatus @default(PENDING)
+
+  course   Course @relation(fields: [courseId], references: [id])
+  courseId  String
 
   assignedTo   User?   @relation(fields: [assignedToId], references: [id])
   assignedToId String?
