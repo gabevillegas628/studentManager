@@ -59,3 +59,9 @@ export interface Comment {
   createdAt: string;
   author: { id: string; name: string; role: Role };
 }
+
+export interface DigestPreferences {
+  digestEnabled: boolean;
+  digestHour: number;
+  digestTimezone: string;
+}

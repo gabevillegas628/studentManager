@@ -8,7 +8,9 @@ import authRoutes from "./routes/auth";
 import requestRoutes from "./routes/requests";
 import userRoutes from "./routes/users";
 import courseRoutes from "./routes/courses";
+import settingsRoutes from "./routes/settings";
 import { errorHandler } from "./middleware/errorHandler";
+import { startDigestScheduler } from "./scheduler/digestScheduler";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,6 +22,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/courses", courseRoutes);
+app.use("/api/settings", settingsRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -43,4 +46,5 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  startDigestScheduler();
 });

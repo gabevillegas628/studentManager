@@ -112,7 +112,7 @@ export default function RequestDetail() {
         </p>
       </div>
 
-      <div className="mt-6 flex gap-6">
+      <div className="mt-6 flex items-end gap-6">
         <div className="w-48">
           <label className="block text-sm font-medium text-gray-700">
             Status
@@ -147,10 +147,27 @@ export default function RequestDetail() {
             ))}
           </select>
         </div>
+
+        <a
+          href={`mailto:${request.studentEmail}?subject=${encodeURIComponent(
+            `Re: ${request.subject} — ${request.course.name}`
+          )}&body=${encodeURIComponent(
+            `Hi ${request.studentName},\n\n\n\n` +
+            `---\n` +
+            `Regarding your ${request.requestType.name} request:\n` +
+            `${request.description}\n`
+          )}`}
+          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+        >
+          Reply to Student
+        </a>
       </div>
 
       <div className="mt-8 border-t border-gray-200 pt-6">
-        <h3 className="text-sm font-medium text-gray-900">Comments</h3>
+        <h3 className="text-sm font-medium text-gray-900">Internal Notes</h3>
+        <p className="mt-0.5 text-xs text-gray-400">
+          Only visible to staff. Students cannot see these notes.
+        </p>
 
         <div className="mt-4 space-y-3">
           {request.comments?.map((c) => (
@@ -183,14 +200,14 @@ export default function RequestDetail() {
             rows={3}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a comment..."
+            placeholder="Add an internal note..."
             className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
           />
           <button
             type="submit"
             className="mt-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
           >
-            Add Comment
+            Add Note
           </button>
         </form>
       </div>

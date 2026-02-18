@@ -15,10 +15,10 @@ export default function SubmitRequest() {
   return (
     <div className="mx-auto max-w-lg px-6 pt-16 text-center">
       <h1 className="text-2xl font-semibold text-gray-900">
-        Student Request Manager
+        Enter Your Class Code
       </h1>
       <p className="mt-2 text-sm text-gray-500">
-        Enter your class code to submit a request to your professor.
+        Your professor should have provided a code or link for their course.
       </p>
 
       <form onSubmit={handleSubmit} className="mx-auto mt-8 flex max-w-xs gap-3">
