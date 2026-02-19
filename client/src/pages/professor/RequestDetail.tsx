@@ -8,6 +8,7 @@ const STATUS_OPTIONS: { value: RequestStatus; label: string }[] = [
   { value: "IN_REVIEW", label: "In Review" },
   { value: "APPROVED", label: "Approved" },
   { value: "DENIED", label: "Denied" },
+  { value: "CLOSED", label: "Closed" },
 ];
 
 const STATUS_COLORS: Record<RequestStatus, string> = {
@@ -15,6 +16,7 @@ const STATUS_COLORS: Record<RequestStatus, string> = {
   IN_REVIEW: "bg-blue-50 text-blue-700",
   APPROVED: "bg-green-50 text-green-700",
   DENIED: "bg-red-50 text-red-700",
+  CLOSED: "bg-green-50 text-green-700",
 };
 
 const selectClass =
@@ -152,11 +154,14 @@ export default function RequestDetail() {
           href={`mailto:${request.studentEmail}?subject=${encodeURIComponent(
             `Re: ${request.subject} — ${request.course.name}`
           )}&body=${encodeURIComponent(
-            `Hi ${request.studentName},\n\n\n\n` +
+            `Hi ${request.studentName.split(" ")[0]},\n\n\n\n` +
             `---\n` +
             `Regarding your ${request.requestType.name} request:\n` +
             `${request.description}\n`
           )}`}
+          onClick={() => {
+            if (request.status === "PENDING") updateStatus("IN_REVIEW");
+          }}
           className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
         >
           Reply to Student

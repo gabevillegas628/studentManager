@@ -1,6 +1,6 @@
 export type Role = "ADMIN" | "PROFESSOR" | "TA";
 
-export type RequestStatus = "PENDING" | "IN_REVIEW" | "APPROVED" | "DENIED";
+export type RequestStatus = "PENDING" | "IN_REVIEW" | "APPROVED" | "DENIED" | "CLOSED";
 
 export interface User {
   id: string;

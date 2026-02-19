@@ -18,6 +18,7 @@ enum RequestStatus {
   IN_REVIEW
   APPROVED
   DENIED
+  CLOSED
 }
 
 model User {

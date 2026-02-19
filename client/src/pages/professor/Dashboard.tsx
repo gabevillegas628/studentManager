@@ -8,6 +8,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   IN_REVIEW: "In Review",
   APPROVED: "Approved",
   DENIED: "Denied",
+  CLOSED: "Closed",
 };
 
 const STATUS_COLORS: Record<RequestStatus, string> = {
@@ -15,6 +16,7 @@ const STATUS_COLORS: Record<RequestStatus, string> = {
   IN_REVIEW: "bg-blue-50 text-blue-700",
   APPROVED: "bg-green-50 text-green-700",
   DENIED: "bg-red-50 text-red-700",
+  CLOSED: "bg-green-50 text-green-700",
 };
 
 const STATUS_BORDER_COLORS: Record<RequestStatus, string> = {
@@ -22,6 +24,7 @@ const STATUS_BORDER_COLORS: Record<RequestStatus, string> = {
   IN_REVIEW: "border-blue-300",
   APPROVED: "border-green-300",
   DENIED: "border-red-300",
+  CLOSED: "border-green-300",
 };
 
 const selectClass =
@@ -52,6 +55,7 @@ export default function Dashboard() {
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     api.get("/courses").then((res) => setCourses(res.data));
@@ -61,7 +65,7 @@ export default function Dashboard() {
     setPage(1);
   }, [filterStatus, filterTypeId, filterCourse]);
 
-  useEffect(() => {
+  function fetchRequests() {
     const params = new URLSearchParams();
     if (filterStatus) params.set("status", filterStatus);
     if (filterTypeId) params.set("requestTypeId", filterTypeId);
@@ -72,6 +76,10 @@ export default function Dashboard() {
       setRequests(res.data.data);
       setTotalPages(res.data.totalPages);
     });
+  }
+
+  useEffect(() => {
+    fetchRequests();
   }, [filterStatus, filterTypeId, filterCourse, page]);
 
   // Build unique type options from loaded requests
@@ -85,17 +93,30 @@ export default function Dashboard() {
     return Array.from(seen, ([id, name]) => ({ id, name }));
   }, [requests]);
 
-  // Client-side sorting
+  // Client-side search + sorting
   const sortedRequests = useMemo(() => {
-    const sorted = [...requests].sort((a, b) => {
+    let filtered = requests;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      filtered = requests.filter((r) =>
+        r.studentName.toLowerCase().includes(q) ||
+        r.studentEmail.toLowerCase().includes(q) ||
+        r.subject.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
+        r.course.name.toLowerCase().includes(q) ||
+        r.requestType.name.toLowerCase().includes(q) ||
+        STATUS_LABELS[r.status].toLowerCase().includes(q) ||
+        (r.assignedTo?.name?.toLowerCase().includes(q) ?? false)
+      );
+    }
+    return [...filtered].sort((a, b) => {
       const aVal = getSortValue(a, sortField);
       const bVal = getSortValue(b, sortField);
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-    return sorted;
-  }, [requests, sortField, sortDir]);
+  }, [requests, search, sortField, sortDir]);
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -157,7 +178,14 @@ export default function Dashboard() {
         Student Requests
       </h1>
 
-      <div className="mt-6 flex gap-3">
+      <div className="mt-6 flex items-center gap-3">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search requests..."
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none w-56"
+        />
         <select
           value={filterCourse}
           onChange={(e) => setFilterCourse(e.target.value)}
@@ -196,6 +224,14 @@ export default function Dashboard() {
             </option>
           ))}
         </select>
+
+        <button
+          onClick={fetchRequests}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 shadow-sm hover:bg-gray-50"
+          title="Refresh"
+        >
+          Refresh
+        </button>
       </div>
 
       <div className="mt-4 overflow-hidden rounded-lg border border-gray-200">

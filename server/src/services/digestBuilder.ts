@@ -150,6 +150,7 @@ const STATUS_LABELS: Record<string, string> = {
   IN_REVIEW: "In Review",
   APPROVED: "Approved",
   DENIED: "Denied",
+  CLOSED: "Closed",
 };
 
 export function renderDigestHtml(data: DigestData, appUrl: string): string {

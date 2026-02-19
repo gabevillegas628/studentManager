@@ -11,6 +11,7 @@ const STATUS_COLORS: Record<RequestStatus, string> = {
   IN_REVIEW: "bg-blue-50 text-blue-700",
   APPROVED: "bg-green-50 text-green-700",
   DENIED: "bg-red-50 text-red-700",
+  CLOSED: "bg-green-50 text-green-700",
 };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
@@ -18,6 +19,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   IN_REVIEW: "In Review",
   APPROVED: "Approved",
   DENIED: "Denied",
+  CLOSED: "Closed",
 };
 
 interface CourseRequestType {
