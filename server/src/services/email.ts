@@ -34,4 +34,6 @@ export async function sendEmail(
     console.error("[Email] Brevo API error:", errorData);
     throw new Error(`Brevo API error: ${response.status}`);
   }
+
+  console.log(`[Email] Sent successfully to ${to}`);
 }

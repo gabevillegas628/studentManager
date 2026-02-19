@@ -47,6 +47,8 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState("");
 
   useEffect(() => {
     api.get("/settings/digest").then((res) => {
@@ -66,6 +68,26 @@ export default function Settings() {
       setMessage("Failed to save preferences.");
     }
     setSaving(false);
+  }
+
+  async function handleTestDigest() {
+    setSendingTest(true);
+    setTestResult("");
+    try {
+      const res = await api.post("/settings/digest/test");
+      if (res.data.warning) {
+        setTestResult(`Sent (no activity): ${res.data.warning}`);
+      } else {
+        setTestResult("Test digest sent! Check your inbox.");
+      }
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response: { data: { error?: string } } }).response?.data?.error || "Request failed"
+          : "Request failed";
+      setTestResult(`Failed: ${msg}`);
+    }
+    setSendingTest(false);
   }
 
   if (loading) {
@@ -163,6 +185,13 @@ export default function Settings() {
           >
             {saving ? "Saving..." : "Save Preferences"}
           </button>
+          <button
+            onClick={handleTestDigest}
+            disabled={sendingTest}
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {sendingTest ? "Sending..." : "Send Test Digest"}
+          </button>
           {message && (
             <span
               className={`text-sm ${
@@ -173,6 +202,15 @@ export default function Settings() {
             </span>
           )}
         </div>
+        {testResult && (
+          <p
+            className={`text-sm ${
+              testResult.startsWith("Failed") ? "text-red-600" : "text-green-600"
+            }`}
+          >
+            {testResult}
+          </p>
+        )}
       </div>
     </div>
   );
