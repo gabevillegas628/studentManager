@@ -1,6 +1,13 @@
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 export default function Home() {
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const token = localStorage.getItem("token");
+
+  if (user && token) {
+    return <Navigate to={user.role === "ADMIN" ? "/admin" : "/dashboard"} replace />;
+  }
+
   return (
     <div className="mx-auto max-w-lg px-6 pt-24 text-center">
       <h1 className="text-3xl font-semibold text-gray-900">
