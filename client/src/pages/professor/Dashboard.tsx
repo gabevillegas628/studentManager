@@ -331,13 +331,29 @@ export default function Dashboard() {
                               {r.description}
                             </p>
                           </div>
-                          <div>
+                          <div className="flex items-center gap-4">
                             <Link
                               to={`/dashboard/requests/${r.id}`}
                               className="inline-flex items-center gap-1 text-sm font-medium text-gray-900 underline underline-offset-4 decoration-gray-300 hover:decoration-gray-900"
                             >
                               View full details &rarr;
                             </Link>
+                            <a
+                              href={`mailto:${r.studentEmail}?subject=${encodeURIComponent(
+                                `Re: ${r.subject} — ${r.course.name}`
+                              )}&body=${encodeURIComponent(
+                                `Hi ${r.studentName.split(" ")[0]},\n\n\n\n` +
+                                `---\n` +
+                                `Regarding your ${r.requestType.name} request:\n` +
+                                `${r.description}\n`
+                              )}`}
+                              onClick={() => {
+                                if (r.status === "PENDING") updateStatus(r.id, "IN_REVIEW");
+                              }}
+                              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                            >
+                              Reply to Student
+                            </a>
                           </div>
                         </div>
                       </td>
