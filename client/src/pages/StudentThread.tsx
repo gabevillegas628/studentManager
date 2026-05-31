@@ -130,40 +130,42 @@ export default function StudentThread() {
         </p>
       </div>
 
-      {/* Original request */}
-      <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">Your request</p>
-        <p className="whitespace-pre-wrap text-sm text-gray-700">{thread.description}</p>
-      </div>
-
       {/* Message thread */}
-      {thread.messages.length > 0 && (
-        <div className="mb-6 space-y-3">
-          {thread.messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.sender === "STUDENT" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
-                  msg.sender === "STUDENT"
-                    ? "bg-gray-900 text-white"
-                    : "border border-gray-200 bg-white text-gray-800"
-                }`}
-              >
-                {msg.sender === "STAFF" && msg.staffName && (
-                  <p className="mb-1 text-xs font-medium text-gray-500">{msg.staffName}</p>
-                )}
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-                <p className={`mt-1.5 text-right text-xs ${msg.sender === "STUDENT" ? "text-gray-400" : "text-gray-400"}`}>
-                  {new Date(msg.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                </p>
-              </div>
-            </div>
-          ))}
-          <div ref={bottomRef} />
+      <div className="mb-6 space-y-3">
+        {/* Original request as first bubble */}
+        <div className="flex justify-end">
+          <div className="max-w-[80%] rounded-lg bg-gray-900 px-4 py-3 text-sm text-white">
+            <p className="whitespace-pre-wrap">{thread.description}</p>
+            <p className="mt-1.5 text-right text-xs text-gray-400">
+              {new Date(thread.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </p>
+          </div>
         </div>
-      )}
+
+        {thread.messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex ${msg.sender === "STUDENT" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[80%] rounded-lg px-4 py-3 text-sm ${
+                msg.sender === "STUDENT"
+                  ? "bg-gray-900 text-white"
+                  : "border border-gray-200 bg-white text-gray-800"
+              }`}
+            >
+              {msg.sender === "STAFF" && msg.staffName && (
+                <p className="mb-1 text-xs font-medium text-gray-500">{msg.staffName}</p>
+              )}
+              <p className="whitespace-pre-wrap">{msg.content}</p>
+              <p className={`mt-1.5 text-right text-xs ${msg.sender === "STUDENT" ? "text-gray-400" : "text-gray-400"}`}>
+                {new Date(msg.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              </p>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
 
       {/* Reply area */}
       {isClosed ? (
