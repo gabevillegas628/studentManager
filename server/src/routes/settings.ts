@@ -74,7 +74,7 @@ router.post("/digest/test", authenticate, async (req: AuthRequest, res: Response
       });
       // Send a minimal digest so we can still test email delivery
       const html = renderDigestHtml(
-        { userName: user.name, newRequests: [], actionItems: [], newComments: [], totalPending: 0 },
+        { userName: user.name, newRequests: [], actionItems: [], newComments: [], studentReplies: [], totalPending: 0 },
         appUrl
       );
       await sendEmail(user.email, `[TEST] Your Daily Digest — ${new Date().toLocaleDateString()}`, html);

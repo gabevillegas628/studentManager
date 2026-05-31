@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../api/client";
-import type { StudentRequest, RequestStatus, Course } from "../../types";
+import type { StudentRequest, RequestStatus, Course, User } from "../../types";
+import RequestModal from "./RequestModal";
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   PENDING: "Pending",
@@ -47,6 +47,7 @@ function getSortValue(r: StudentRequest, field: SortField): string {
 export default function Dashboard() {
   const [requests, setRequests] = useState<StudentRequest[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [staff, setStaff] = useState<User[]>([]);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterTypeId, setFilterTypeId] = useState("");
   const [filterCourse, setFilterCourse] = useState("");
@@ -54,11 +55,25 @@ export default function Dashboard() {
   const [totalPages, setTotalPages] = useState(1);
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [hasNew, setHasNew] = useState(false);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+
+  const activeRequestIdRef = useRef(activeRequestId);
+  activeRequestIdRef.current = activeRequestId;
 
   useEffect(() => {
     api.get("/courses").then((res) => setCourses(res.data));
+    api.get("/users").then((res) => setStaff(res.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const es = new EventSource(`/api/events?token=${token}`);
+    es.addEventListener("new_request", () => { fetchRequests(); setHasNew(true); });
+    es.addEventListener("new_message", () => { fetchRequests(); setHasNew(true); });
+    return () => es.close();
   }, []);
 
   useEffect(() => {
@@ -71,7 +86,6 @@ export default function Dashboard() {
     if (filterTypeId) params.set("requestTypeId", filterTypeId);
     if (filterCourse) params.set("courseId", filterCourse);
     params.set("page", String(page));
-
     api.get(`/requests?${params}`).then((res) => {
       setRequests(res.data.data);
       setTotalPages(res.data.totalPages);
@@ -82,18 +96,14 @@ export default function Dashboard() {
     fetchRequests();
   }, [filterStatus, filterTypeId, filterCourse, page]);
 
-  // Build unique type options from loaded requests
   const typeOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const r of requests) {
-      if (!seen.has(r.requestType.id)) {
-        seen.set(r.requestType.id, r.requestType.name);
-      }
+      if (!seen.has(r.requestType.id)) seen.set(r.requestType.id, r.requestType.name);
     }
     return Array.from(seen, ([id, name]) => ({ id, name }));
   }, [requests]);
 
-  // Client-side search + sorting
   const sortedRequests = useMemo(() => {
     let filtered = requests;
     if (search.trim()) {
@@ -127,46 +137,22 @@ export default function Dashboard() {
     }
   }
 
-  function toggleExpand(id: string) {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   async function updateStatus(id: string, status: RequestStatus) {
-    setRequests((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status } : r))
-    );
+    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
     try {
       await api.patch(`/requests/${id}`, { status });
     } catch {
-      // Revert on failure — refetch
-      const params = new URLSearchParams();
-      if (filterStatus) params.set("status", filterStatus);
-      if (filterTypeId) params.set("requestTypeId", filterTypeId);
-      if (filterCourse) params.set("courseId", filterCourse);
-      params.set("page", String(page));
-      api.get(`/requests?${params}`).then((res) => {
-        setRequests(res.data.data);
-      });
+      fetchRequests();
     }
   }
 
   function SortHeader({ field, children }: { field: SortField; children: React.ReactNode }) {
     const active = sortField === field;
     return (
-      <th
-        className="px-4 py-3 cursor-pointer select-none hover:text-gray-700"
-        onClick={() => handleSort(field)}
-      >
+      <th className="px-4 py-3 cursor-pointer select-none hover:text-gray-700" onClick={() => handleSort(field)}>
         <span className="inline-flex items-center gap-1">
           {children}
-          {active && (
-            <span className="text-gray-400">{sortDir === "asc" ? "\u25B2" : "\u25BC"}</span>
-          )}
+          {active && <span className="text-gray-400">{sortDir === "asc" ? "▲" : "▼"}</span>}
         </span>
       </th>
     );
@@ -174,9 +160,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900">
-        Student Requests
-      </h1>
+      <h1 className="text-2xl font-semibold text-gray-900">Student Requests</h1>
 
       <div className="mt-6 flex items-center gap-3">
         <input
@@ -186,50 +170,25 @@ export default function Dashboard() {
           placeholder="Search requests..."
           className="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-gray-500 focus:outline-none w-56"
         />
-        <select
-          value={filterCourse}
-          onChange={(e) => setFilterCourse(e.target.value)}
-          className={selectClass}
-        >
+        <select value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)} className={selectClass}>
           <option value="">All Courses</option>
-          {courses.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className={selectClass}
-        >
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass}>
           <option value="">All Statuses</option>
-          {Object.entries(STATUS_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
+          {Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
-
-        <select
-          value={filterTypeId}
-          onChange={(e) => setFilterTypeId(e.target.value)}
-          className={selectClass}
-        >
+        <select value={filterTypeId} onChange={(e) => setFilterTypeId(e.target.value)} className={selectClass}>
           <option value="">All Types</option>
-          {typeOptions.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
+          {typeOptions.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
-
         <button
-          onClick={fetchRequests}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 shadow-sm hover:bg-gray-50"
-          title="Refresh"
+          onClick={() => { fetchRequests(); setHasNew(false); }}
+          className="relative rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-600 shadow-sm hover:bg-gray-50"
         >
+          {hasNew && (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white" />
+          )}
           Refresh
         </button>
       </div>
@@ -238,7 +197,6 @@ export default function Dashboard() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-xs font-medium uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="w-8 px-2 py-3" />
               <SortHeader field="createdAt">Date</SortHeader>
               <SortHeader field="studentName">Student</SortHeader>
               <SortHeader field="course">Course</SortHeader>
@@ -249,125 +207,38 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sortedRequests.map((r) => {
-              const expanded = expandedIds.has(r.id);
-              return (
-                <Fragment key={r.id}>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-2 py-3">
-                      <button
-                        onClick={() => toggleExpand(r.id)}
-                        className="rounded p-0.5 text-gray-400 hover:text-gray-700"
-                      >
-                        <svg
-                          className={`h-4 w-4 transition-transform ${expanded ? "rotate-90" : ""}`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-500">
-                      {new Date(r.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3 text-gray-900">{r.studentName}</td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {r.course.name}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {r.requestType.name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        to={`/dashboard/requests/${r.id}`}
-                        className="font-medium text-gray-900 underline underline-offset-4 decoration-gray-300 hover:decoration-gray-900"
-                      >
-                        {r.subject}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={r.status}
-                        onChange={(e) => updateStatus(r.id, e.target.value as RequestStatus)}
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium border ${STATUS_COLORS[r.status]} ${STATUS_BORDER_COLORS[r.status]} cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-400`}
-                      >
-                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                          <option key={key} value={key}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {r.assignedTo?.name ?? (
-                        <span className="text-gray-300">Unassigned</span>
-                      )}
-                    </td>
-                  </tr>
-                  {expanded && (
-                    <tr key={`${r.id}-detail`} className="bg-gray-50">
-                      <td colSpan={8} className="px-4 py-4">
-                        <div className="ml-6 space-y-3">
-                          <div className="grid grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <span className="text-xs font-medium uppercase text-gray-500">Student Email</span>
-                              <p className="mt-0.5 text-gray-900">{r.studentEmail}</p>
-                            </div>
-                            <div>
-                              <span className="text-xs font-medium uppercase text-gray-500">Submitted</span>
-                              <p className="mt-0.5 text-gray-900">{new Date(r.createdAt).toLocaleString()}</p>
-                            </div>
-                            <div>
-                              <span className="text-xs font-medium uppercase text-gray-500">Last Updated</span>
-                              <p className="mt-0.5 text-gray-900">{new Date(r.updatedAt).toLocaleString()}</p>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-xs font-medium uppercase text-gray-500">Description</span>
-                            <p className="mt-1 whitespace-pre-wrap rounded-md border border-gray-200 bg-white p-3 text-sm text-gray-900">
-                              {r.description}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <Link
-                              to={`/dashboard/requests/${r.id}`}
-                              className="inline-flex items-center gap-1 text-sm font-medium text-gray-900 underline underline-offset-4 decoration-gray-300 hover:decoration-gray-900"
-                            >
-                              View full details &rarr;
-                            </Link>
-                            <a
-                              href={`mailto:${r.studentEmail}?subject=${encodeURIComponent(
-                                `Re: ${r.subject} — ${r.course.name}`
-                              )}&body=${encodeURIComponent(
-                                `Hi ${r.studentName.split(" ")[0]},\n\n\n\n` +
-                                `---\n` +
-                                `Regarding your ${r.requestType.name} request:\n` +
-                                `${r.description}\n`
-                              )}`}
-                              onClick={() => {
-                                if (r.status === "PENDING") updateStatus(r.id, "IN_REVIEW");
-                              }}
-                              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-                            >
-                              Reply to Student
-                            </a>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
+            {sortedRequests.map((r) => (
+              <tr
+                key={r.id}
+                className="cursor-pointer hover:bg-gray-50"
+                onClick={() => setActiveRequestId(r.id)}
+              >
+                <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                  {new Date(r.createdAt).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 text-gray-900">{r.studentName}</td>
+                <td className="px-4 py-3 text-gray-500">{r.course.name}</td>
+                <td className="px-4 py-3 text-gray-500">{r.requestType.name}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">{r.subject}</td>
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <select
+                    value={r.status}
+                    onChange={(e) => updateStatus(r.id, e.target.value as RequestStatus)}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium border ${STATUS_COLORS[r.status]} ${STATUS_BORDER_COLORS[r.status]} cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-400`}
+                  >
+                    {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-4 py-3 text-gray-500">
+                  {r.assignedTo?.name ?? <span className="text-gray-300">Unassigned</span>}
+                </td>
+              </tr>
+            ))}
             {requests.length === 0 && (
               <tr>
-                <td
-                  colSpan={8}
-                  className="px-4 py-12 text-center text-gray-400"
-                >
+                <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
                   No requests found.
                 </td>
               </tr>
@@ -378,9 +249,7 @@ export default function Dashboard() {
 
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
-          <span className="text-gray-500">
-            Page {page} of {totalPages}
-          </span>
+          <span className="text-gray-500">Page {page} of {totalPages}</span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -399,6 +268,18 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <RequestModal
+        requestId={activeRequestId}
+        staff={staff}
+        onClose={() => setActiveRequestId(null)}
+        onStatusChange={(id, status) =>
+          setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
+        }
+        onAssignmentChange={(id, assignedTo) =>
+          setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, assignedTo: assignedTo ?? undefined } : r)))
+        }
+      />
     </div>
   );
 }

@@ -91,6 +91,7 @@ model Request {
   subject      String
   description  String
   status       RequestStatus @default(PENDING)
+  studentToken String        @unique @default(uuid())
 
   course   Course @relation(fields: [courseId], references: [id])
   courseId  String
@@ -99,8 +100,25 @@ model Request {
   assignedToId String?
 
   comments  Comment[]
+  messages  Message[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+enum MessageSender {
+  STUDENT
+  STAFF
+}
+
+model Message {
+  id        String        @id @default(uuid())
+  content   String
+  sender    MessageSender
+  staffName String?
+  createdAt DateTime      @default(now())
+
+  request   Request @relation(fields: [requestId], references: [id])
+  requestId String
 }
 
 model Comment {

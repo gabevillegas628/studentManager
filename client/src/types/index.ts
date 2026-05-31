@@ -38,8 +38,19 @@ export interface CourseMember {
   user: { id: string; name: string; email: string; role: Role };
 }
 
+export type MessageSender = "STUDENT" | "STAFF";
+
+export interface Message {
+  id: string;
+  content: string;
+  sender: MessageSender;
+  staffName: string | null;
+  createdAt: string;
+}
+
 export interface StudentRequest {
   id: string;
+  studentToken: string;
   requestType: { id: string; name: string };
   studentName: string;
   studentEmail: string;
@@ -49,6 +60,7 @@ export interface StudentRequest {
   course: { id: string; name: string; code: string };
   assignedTo?: { id: string; name: string } | null;
   comments?: Comment[];
+  messages?: Message[];
   createdAt: string;
   updatedAt: string;
 }

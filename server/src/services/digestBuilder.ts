@@ -1,4 +1,5 @@
 import { PrismaClient, User } from "@prisma/client";
+import { getCourseIdsForUser } from "./courseUtils";
 
 const prisma = new PrismaClient();
 
@@ -18,35 +19,22 @@ interface DigestComment {
   contentPreview: string;
 }
 
+interface DigestStudentReply {
+  requestId: string;
+  requestSubject: string;
+  studentName: string;
+  contentPreview: string;
+}
+
 interface DigestData {
   userName: string;
   newRequests: DigestRequest[];
   actionItems: DigestRequest[];
   newComments: DigestComment[];
+  studentReplies: DigestStudentReply[];
   totalPending: number;
 }
 
-async function getCourseIdsForUser(user: User): Promise<string[]> {
-  if (user.role === "ADMIN") {
-    const courses = await prisma.course.findMany({ select: { id: true } });
-    return courses.map((c) => c.id);
-  }
-
-  if (user.role === "PROFESSOR") {
-    const courses = await prisma.course.findMany({
-      where: { ownerId: user.id },
-      select: { id: true },
-    });
-    return courses.map((c) => c.id);
-  }
-
-  // TA
-  const memberships = await prisma.courseMember.findMany({
-    where: { userId: user.id },
-    select: { courseId: true },
-  });
-  return memberships.map((m) => m.courseId);
-}
 
 export async function buildDigestForUser(
   user: User
@@ -56,7 +44,7 @@ export async function buildDigestForUser(
 
   const since = user.lastDigestSentAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [newRequests, actionItems, newComments, totalPending] =
+  const [newRequests, actionItems, newComments, studentReplies, totalPending] =
     await Promise.all([
       // New requests since last digest
       prisma.request.findMany({
@@ -99,6 +87,20 @@ export async function buildDigestForUser(
         take: 15,
       }),
 
+      // Student replies since last digest
+      prisma.message.findMany({
+        where: {
+          createdAt: { gt: since },
+          sender: "STUDENT",
+          request: { courseId: { in: courseIds } },
+        },
+        include: {
+          request: { select: { id: true, subject: true, studentName: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 15,
+      }),
+
       // Total pending count
       prisma.request.count({
         where: {
@@ -111,7 +113,8 @@ export async function buildDigestForUser(
   if (
     newRequests.length === 0 &&
     actionItems.length === 0 &&
-    newComments.length === 0
+    newComments.length === 0 &&
+    studentReplies.length === 0
   ) {
     return null;
   }
@@ -140,6 +143,13 @@ export async function buildDigestForUser(
       authorName: c.author.name,
       contentPreview:
         c.content.length > 100 ? c.content.slice(0, 100) + "..." : c.content,
+    })),
+    studentReplies: studentReplies.map((m) => ({
+      requestId: m.request.id,
+      requestSubject: m.request.subject,
+      studentName: m.request.studentName,
+      contentPreview:
+        m.content.length > 100 ? m.content.slice(0, 100) + "..." : m.content,
     })),
     totalPending,
   };
@@ -234,6 +244,25 @@ export function renderDigestHtml(data: DigestData, appUrl: string): string {
     <div style="margin-bottom:24px;">
       <h2 style="font-size:16px;color:#111827;margin-bottom:4px;">New Staff Notes (${data.newComments.length})</h2>
       <p style="font-size:13px;color:#6b7280;margin:0 0 8px;">Internal notes from staff on requests in your courses.</p>
+      <ul style="list-style:none;padding:0;margin:0;font-size:14px;">${items}</ul>
+    </div>`;
+  }
+
+  if (data.studentReplies.length > 0) {
+    const items = data.studentReplies
+      .map(
+        (r) => `
+      <li style="padding:6px 0;border-bottom:1px solid #f3f4f6;">
+        <strong>${r.studentName}</strong> replied on <em>${r.requestSubject}</em>: ${r.contentPreview}
+        — <a href="${dashboardUrl}/requests/${r.requestId}" style="color:#374151;">View thread</a>
+      </li>`
+      )
+      .join("");
+
+    sections += `
+    <div style="margin-bottom:24px;">
+      <h2 style="font-size:16px;color:#111827;margin-bottom:4px;">Student Replies (${data.studentReplies.length})</h2>
+      <p style="font-size:13px;color:#6b7280;margin:0 0 8px;">Messages from students since your last digest.</p>
       <ul style="list-style:none;padding:0;margin:0;font-size:14px;">${items}</ul>
     </div>`;
   }

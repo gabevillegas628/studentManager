@@ -20,6 +20,7 @@ export function authenticate(
     const payload = jwt.verify(token, JWT_SECRET) as {
       id: string;
       email: string;
+      name: string;
       role: string;
     };
     req.user = payload;

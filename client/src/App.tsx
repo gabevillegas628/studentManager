@@ -19,6 +19,7 @@ import Home from "./pages/Home";
 import SubmitRequest from "./pages/SubmitRequest";
 import ClassSubmit from "./pages/ClassSubmit";
 import Settings from "./pages/professor/Settings";
+import StudentThread from "./pages/StudentThread";
 import RequireAuth from "./components/RequireAuth";
 
 function TopNav() {
@@ -82,6 +83,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/submit" element={<SubmitRequest />} />
         <Route path="/c/:code" element={<ClassSubmit />} />
+        <Route path="/request/:token" element={<StudentThread />} />
         <Route path="/login" element={<Login />} />
         <Route element={<RequireAuth />}>
           <Route path="/dashboard" element={<ProfessorLayout />}>

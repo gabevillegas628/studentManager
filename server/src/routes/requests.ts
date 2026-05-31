@@ -2,6 +2,9 @@ import { Router, Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticate } from "../middleware/auth";
 import { AuthRequest } from "../types";
+import { sendEmail } from "../services/email";
+import { renderSubmissionConfirmationEmail, renderProfessorReplyEmail } from "../services/emailTemplates";
+import { emitToCourses } from "../services/sseManager";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -34,9 +37,33 @@ router.post("/", async (req: Request, res: Response) => {
 
   const request = await prisma.request.create({
     data: { requestTypeId, studentName, studentEmail, courseId, subject, description },
+    include: { course: { select: { name: true } } },
   });
 
-  res.status(201).json({ id: request.id, status: request.status });
+  const appUrl = process.env.APP_URL || "";
+  const tokenUrl = `${appUrl}/request/${request.studentToken}`;
+  const { subject: emailSubject, html } = renderSubmissionConfirmationEmail({
+    studentName,
+    subject,
+    courseName: request.course.name,
+    tokenUrl,
+  });
+  sendEmail(studentEmail, emailSubject, html).catch((err) =>
+    console.error("[Email] Failed to send submission confirmation:", err)
+  );
+
+  emitToCourses([courseId], "new_request", {
+    requestId: request.id,
+    subject,
+    studentName,
+    courseId,
+  });
+
+  res.status(201).json({
+    id: request.id,
+    status: request.status,
+    studentToken: request.studentToken,
+  });
 });
 
 // Public: student looks up their requests by email + course
@@ -98,7 +125,7 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const role = req.user!.role;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { course: { active: true } };
   if (status) where.status = status;
   if (requestTypeId) where.requestTypeId = requestTypeId;
   if (courseId) where.courseId = courseId;
@@ -162,6 +189,7 @@ router.get("/:id", authenticate, async (req: AuthRequest, res: Response) => {
         include: { author: { select: { id: true, name: true, role: true } } },
         orderBy: { createdAt: "asc" },
       },
+      messages: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -228,6 +256,71 @@ router.post(
     });
 
     res.status(201).json(comment);
+  }
+);
+
+// Protected: professor/TA posts a reply to a student
+router.post(
+  "/:id/messages",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    const { content } = req.body;
+    if (!content || content.trim().length === 0) {
+      res.status(400).json({ error: "Content is required" });
+      return;
+    }
+    if (content.length > 5000) {
+      res.status(400).json({ error: "Message too long (max 5000 characters)" });
+      return;
+    }
+
+    const requestId = req.params.id as string;
+    const request = await prisma.request.findUnique({
+      where: { id: requestId },
+      include: {
+        course: {
+          select: { id: true, name: true, ownerId: true, members: { select: { userId: true } } },
+        },
+      },
+    });
+
+    if (!request) {
+      res.status(404).json({ error: "Request not found" });
+      return;
+    }
+
+    const userId = req.user!.id;
+    const role = req.user!.role;
+    const isOwner = request.course.ownerId === userId;
+    const isMember = request.course.members.some((m) => m.userId === userId);
+    if (role !== "ADMIN" && !isOwner && !isMember) {
+      res.status(403).json({ error: "You don't have access to this request" });
+      return;
+    }
+
+    const message = await prisma.message.create({
+      data: {
+        content,
+        sender: "STAFF",
+        staffName: req.user!.name,
+        requestId,
+      },
+    });
+
+    const appUrl = process.env.APP_URL || "";
+    const tokenUrl = `${appUrl}/request/${request.studentToken}`;
+    const { subject: emailSubject, html } = renderProfessorReplyEmail({
+      studentName: request.studentName,
+      subject: request.subject,
+      courseName: request.course.name,
+      replyContent: content,
+      tokenUrl,
+    });
+    sendEmail(request.studentEmail, emailSubject, html).catch((err) =>
+      console.error("[Email] Failed to send professor reply notification:", err)
+    );
+
+    res.status(201).json(message);
   }
 );
 

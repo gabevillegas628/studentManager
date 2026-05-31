@@ -50,7 +50,7 @@ export default function ClassSubmit() {
   const { code } = useParams<{ code: string }>();
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<{ id: string; token: string } | null>(null);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"submit" | "status">("submit");
 
@@ -93,7 +93,7 @@ export default function ClassSubmit() {
         ...form,
         courseId: course!.id,
       });
-      setSubmitted(data.id);
+      setSubmitted({ id: data.id, token: data.studentToken });
     } catch {
       setError("Failed to submit request. Please try again.");
     }
@@ -185,18 +185,23 @@ export default function ClassSubmit() {
             Your request has been submitted to {course.name}.
           </p>
           <p className="mt-4 text-sm text-gray-500">
-            You can check the status of your requests anytime using the
-            "Check Status" tab.
+            Check your email for a confirmation with a link to track your request and view replies.
           </p>
+          <Link
+            to={`/request/${submitted.token}`}
+            className="mt-4 inline-block rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Track Your Request &rarr;
+          </Link>
           <button
             onClick={() => {
               setSubmitted(null);
               setMode("status");
               setLookupEmail(form.studentEmail);
             }}
-            className="mt-4 inline-block text-sm font-medium text-gray-900 underline underline-offset-4 hover:text-gray-600"
+            className="mt-3 block text-sm text-gray-500 underline underline-offset-4 hover:text-gray-700"
           >
-            Check Status
+            Check all requests for this course
           </button>
         </div>
       </div>
@@ -257,30 +262,31 @@ export default function ClassSubmit() {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Your Name
-              </label>
-              <input
-                value={form.studentName}
-                onChange={(e) => updateField("studentName", e.target.value)}
-                required
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Your Email
-              </label>
-              <input
-                type="email"
-                value={form.studentEmail}
-                onChange={(e) => updateField("studentEmail", e.target.value)}
-                required
-                className={inputClass}
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Full Name
+            </label>
+            <input
+              value={form.studentName}
+              onChange={(e) => updateField("studentName", e.target.value)}
+              placeholder="First and last name"
+              required
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={form.studentEmail}
+              onChange={(e) => updateField("studentEmail", e.target.value)}
+              placeholder="you@university.edu"
+              required
+              className={inputClass}
+            />
           </div>
 
           <div>
