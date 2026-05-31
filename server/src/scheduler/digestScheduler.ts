@@ -20,7 +20,7 @@ function getCurrentHourInTimezone(timezone: string): number {
 }
 
 export function startDigestScheduler(): void {
-  const appUrl = process.env.APP_URL || "http://localhost:5173";
+  const appUrl = (process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "");
 
   // Run at the top of every hour
   cron.schedule("0 * * * *", async () => {

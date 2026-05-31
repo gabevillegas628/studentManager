@@ -40,7 +40,7 @@ router.post("/", async (req: Request, res: Response) => {
     include: { course: { select: { name: true } } },
   });
 
-  const appUrl = process.env.APP_URL || "";
+  const appUrl = (process.env.APP_URL || "").replace(/\/$/, "");
   const tokenUrl = `${appUrl}/request/${request.studentToken}`;
   const { subject: emailSubject, html } = renderSubmissionConfirmationEmail({
     studentName,
@@ -307,7 +307,7 @@ router.post(
       },
     });
 
-    const appUrl = process.env.APP_URL || "";
+    const appUrl = (process.env.APP_URL || "").replace(/\/$/, "");
     const tokenUrl = `${appUrl}/request/${request.studentToken}`;
     const { subject: emailSubject, html } = renderProfessorReplyEmail({
       studentName: request.studentName,

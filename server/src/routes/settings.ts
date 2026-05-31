@@ -63,7 +63,7 @@ router.post("/digest/test", authenticate, async (req: AuthRequest, res: Response
     return;
   }
 
-  const appUrl = process.env.APP_URL || "http://localhost:5173";
+  const appUrl = (process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "");
 
   try {
     const digestData = await buildDigestForUser(user);
