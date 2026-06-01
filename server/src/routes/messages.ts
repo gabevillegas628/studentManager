@@ -11,7 +11,7 @@ router.get("/thread/:token", async (req: Request, res: Response) => {
   const request = await prisma.request.findUnique({
     where: { studentToken: token },
     include: {
-      course: { select: { name: true } },
+      course: { select: { id: true, name: true, code: true, slug: true } },
       requestType: { select: { name: true } },
       messages: { orderBy: { createdAt: "asc" } },
     },
@@ -29,7 +29,9 @@ router.get("/thread/:token", async (req: Request, res: Response) => {
     status: request.status,
     studentName: request.studentName,
     createdAt: request.createdAt,
+    courseId: request.course.id,
     courseName: request.course.name,
+    courseCode: request.course.slug ?? request.course.code,
     requestTypeName: request.requestType.name,
     messages: request.messages,
   });

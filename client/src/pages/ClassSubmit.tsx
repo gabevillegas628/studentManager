@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import api from "../api/client";
 import type { RequestStatus } from "../types";
 
@@ -49,11 +49,14 @@ interface StatusResult {
 
 export default function ClassSubmit() {
   const { code } = useParams<{ code: string }>();
+  const location = useLocation();
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [submitted, setSubmitted] = useState<{ id: string; token: string } | null>(null);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"submit" | "status">("submit");
+  const [mode, setMode] = useState<"submit" | "status">(
+    (location.state as { statusTab?: boolean } | null)?.statusTab ? "status" : "submit"
+  );
 
   // Submit form state
   const [form, setForm] = useState({
@@ -78,10 +81,28 @@ export default function ClassSubmit() {
     api
       .get(`/courses/lookup/${code}`)
       .then((res) => {
-        setCourse(res.data);
-        if (res.data.requestTypes?.length > 0) {
-          setForm((prev) => ({ ...prev, requestTypeId: res.data.requestTypes[0].id }));
+        const c = res.data;
+        setCourse(c);
+        if (c.requestTypes?.length > 0) {
+          setForm((prev) => ({ ...prev, requestTypeId: c.requestTypes[0].id }));
         }
+        // Restore verified session if still valid
+        try {
+          const stored = sessionStorage.getItem(`srm_verified_${c.id}`);
+          if (stored) {
+            const session = JSON.parse(stored) as { email: string; expiresAt: number };
+            if (session.expiresAt > Date.now()) {
+              setLookupEmail(session.email);
+              setOtpSent(true);
+              setStatusLoaded(true);
+              const storedResults = sessionStorage.getItem(`srm_results_${c.id}`);
+              if (storedResults) setStatusResults(JSON.parse(storedResults));
+            } else {
+              sessionStorage.removeItem(`srm_verified_${c.id}`);
+              sessionStorage.removeItem(`srm_results_${c.id}`);
+            }
+          }
+        } catch {}
       })
       .catch(() => setNotFound(true));
   }, [code]);
@@ -128,6 +149,9 @@ export default function ClassSubmit() {
         studentEmail: lookupEmail,
         code: otpCode,
       });
+      const expiresAt = Date.now() + 60 * 60 * 1000;
+      sessionStorage.setItem(`srm_verified_${course!.id}`, JSON.stringify({ email: lookupEmail, expiresAt }));
+      sessionStorage.setItem(`srm_results_${course!.id}`, JSON.stringify(data));
       setStatusResults(data);
       setStatusLoaded(true);
     } catch {

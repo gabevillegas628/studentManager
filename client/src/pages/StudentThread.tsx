@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 
 type RequestStatus = "PENDING" | "IN_REVIEW" | "APPROVED" | "DENIED" | "CLOSED";
 type MessageSender = "STUDENT" | "STAFF";
@@ -19,7 +19,9 @@ interface ThreadData {
   status: RequestStatus;
   studentName: string;
   createdAt: string;
+  courseId: string;
   courseName: string;
+  courseCode: string;
   requestTypeName: string;
   messages: ThreadMessage[];
 }
@@ -114,10 +116,28 @@ export default function StudentThread() {
 
   const isClosed = CLOSED_STATUSES.includes(thread.status);
 
+  const hasSession = (() => {
+    try {
+      const stored = sessionStorage.getItem(`srm_verified_${thread.courseId}`);
+      if (!stored) return false;
+      const session = JSON.parse(stored) as { expiresAt: number };
+      return session.expiresAt > Date.now();
+    } catch { return false; }
+  })();
+
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
       {/* Header */}
       <div className="mb-6">
+        {hasSession && (
+          <Link
+            to={`/c/${thread.courseCode}`}
+            state={{ statusTab: true }}
+            className="mb-3 inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700"
+          >
+            ← All requests
+          </Link>
+        )}
         <p className="text-sm text-gray-500">{thread.courseName} · {thread.requestTypeName}</p>
         <div className="mt-1 flex items-center gap-3">
           <h1 className="text-2xl font-semibold text-gray-900">{thread.subject}</h1>
