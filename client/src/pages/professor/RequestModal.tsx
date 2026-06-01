@@ -26,6 +26,7 @@ interface Props {
   onClose: () => void;
   onStatusChange: (id: string, status: RequestStatus) => void;
   onAssignmentChange: (id: string, assignedTo: { id: string; name: string } | null) => void;
+  onRead: (id: string) => void;
 }
 
 const STATUS_OPTIONS: { value: RequestStatus; label: string }[] = [
@@ -44,7 +45,7 @@ const STATUS_COLORS: Record<RequestStatus, string> = {
   CLOSED: "bg-gray-100 text-gray-600",
 };
 
-export default function RequestModal({ requestId, staff, onClose, onStatusChange, onAssignmentChange }: Props) {
+export default function RequestModal({ requestId, staff, onClose, onStatusChange, onAssignmentChange, onRead }: Props) {
   const [request, setRequest] = useState<ModalRequest | null>(null);
   const [loading, setLoading] = useState(false);
   const [replyContent, setReplyContent] = useState("");
@@ -63,7 +64,10 @@ export default function RequestModal({ requestId, staff, onClose, onStatusChange
     setReplyContent("");
     setNoteContent("");
     api.get(`/requests/${requestId}`)
-      .then((res) => setRequest(res.data))
+      .then((res) => {
+        setRequest(res.data);
+        api.post(`/requests/${requestId}/mark-read`).then(() => onRead(requestId));
+      })
       .finally(() => setLoading(false));
   }, [requestId]);
 

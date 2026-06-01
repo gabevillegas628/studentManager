@@ -61,6 +61,7 @@ export interface StudentRequest {
   assignedTo?: { id: string; name: string } | null;
   comments?: Comment[];
   messages?: Message[];
+  hasUnread?: boolean;
   createdAt: string;
   updatedAt: string;
 }

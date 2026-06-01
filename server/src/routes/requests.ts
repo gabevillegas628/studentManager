@@ -219,6 +219,12 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         assignedTo: { select: { id: true, name: true } },
         course: { select: { id: true, name: true, code: true } },
         requestType: { select: { id: true, name: true } },
+        messages: {
+          where: { sender: "STUDENT" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true },
+        },
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -227,7 +233,23 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
     prisma.request.count({ where }),
   ]);
 
-  res.json({ data: requests, total, page, totalPages: Math.ceil(total / limit) });
+  const requestIds = requests.map((r) => r.id);
+  const userReads = await prisma.requestRead.findMany({
+    where: { userId, requestId: { in: requestIds } },
+    select: { requestId: true, readAt: true },
+  });
+  const readMap = new Map(userReads.map((r) => [r.requestId, r.readAt]));
+
+  const data = requests.map(({ messages, ...r }) => {
+    const lastStudentMsgAt = messages[0]?.createdAt ?? null;
+    const readAt = readMap.get(r.id) ?? null;
+    const hasUnread = lastStudentMsgAt
+      ? readAt === null || lastStudentMsgAt > readAt
+      : false;
+    return { ...r, hasUnread };
+  });
+
+  res.json({ data, total, page, totalPages: Math.ceil(total / limit) });
 });
 
 // Protected: get request details (with authorization)
@@ -295,6 +317,20 @@ router.patch("/:id", authenticate, async (req: AuthRequest, res: Response) => {
   res.json(request);
 });
 
+// Protected: mark a request as read for the current user
+router.post("/:id/mark-read", authenticate, async (req: AuthRequest, res: Response) => {
+  const requestId = req.params.id as string;
+  const userId = req.user!.id;
+
+  await prisma.requestRead.upsert({
+    where: { userId_requestId: { userId, requestId } },
+    create: { userId, requestId },
+    update: { readAt: new Date() },
+  });
+
+  res.json({ ok: true });
+});
+
 // Protected: add comment to request
 router.post(
   "/:id/comments",
@@ -360,14 +396,21 @@ router.post(
       return;
     }
 
-    const message = await prisma.message.create({
-      data: {
-        content,
-        sender: "STAFF",
-        staffName: req.user!.name,
-        requestId,
-      },
-    });
+    const [message] = await Promise.all([
+      prisma.message.create({
+        data: {
+          content,
+          sender: "STAFF",
+          staffName: req.user!.name,
+          requestId,
+        },
+      }),
+      prisma.requestRead.upsert({
+        where: { userId_requestId: { userId, requestId } },
+        create: { userId, requestId },
+        update: { readAt: new Date() },
+      }),
+    ]);
 
     const appUrl = (process.env.APP_URL || "").replace(/\/$/, "");
     const tokenUrl = `${appUrl}/request/${request.studentToken}`;

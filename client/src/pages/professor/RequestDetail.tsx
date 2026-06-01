@@ -34,7 +34,10 @@ export default function RequestDetail() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
-    api.get(`/requests/${id}`).then((res) => setRequest(res.data));
+    api.get(`/requests/${id}`).then((res) => {
+      setRequest(res.data);
+      api.post(`/requests/${id}/mark-read`).catch(() => {});
+    });
     api.get("/users").then((res) => setStaff(res.data)).catch(() => {});
   }, [id]);
 

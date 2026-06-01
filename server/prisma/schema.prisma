@@ -40,6 +40,7 @@ model User {
   courseMemberships CourseMember[]
   assignedRequests Request[]
   comments         Comment[]
+  requestReads     RequestRead[]
 }
 
 model Course {
@@ -99,10 +100,11 @@ model Request {
   assignedTo   User?   @relation(fields: [assignedToId], references: [id])
   assignedToId String?
 
-  comments  Comment[]
-  messages  Message[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  comments     Comment[]
+  messages     Message[]
+  requestReads RequestRead[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 enum MessageSender {
@@ -131,4 +133,15 @@ model Comment {
 
   author   User   @relation(fields: [authorId], references: [id])
   authorId String
+}
+
+model RequestRead {
+  userId    String
+  requestId String
+  readAt    DateTime @default(now()) @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  request Request @relation(fields: [requestId], references: [id])
+
+  @@id([userId, requestId])
 }

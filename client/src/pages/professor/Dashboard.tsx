@@ -210,7 +210,7 @@ export default function Dashboard() {
             {sortedRequests.map((r) => (
               <tr
                 key={r.id}
-                className="cursor-pointer hover:bg-gray-50"
+                className={`cursor-pointer hover:bg-gray-50 ${r.hasUnread ? "bg-blue-50/40" : ""}`}
                 onClick={() => setActiveRequestId(r.id)}
               >
                 <td className="whitespace-nowrap px-4 py-3 text-gray-500">
@@ -219,7 +219,14 @@ export default function Dashboard() {
                 <td className="px-4 py-3 text-gray-900">{r.studentName}</td>
                 <td className="px-4 py-3 text-gray-500">{r.course.name}</td>
                 <td className="px-4 py-3 text-gray-500">{r.requestType.name}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">{r.subject}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">
+                  <span className="flex items-center gap-1.5">
+                    {r.hasUnread && (
+                      <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-blue-500" title="New student message" />
+                    )}
+                    {r.subject}
+                  </span>
+                </td>
                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <select
                     value={r.status}
@@ -278,6 +285,9 @@ export default function Dashboard() {
         }
         onAssignmentChange={(id, assignedTo) =>
           setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, assignedTo: assignedTo ?? undefined } : r)))
+        }
+        onRead={(id) =>
+          setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, hasUnread: false } : r)))
         }
       />
     </div>
