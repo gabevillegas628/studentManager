@@ -43,6 +43,7 @@ interface StatusResult {
   subject: string;
   status: RequestStatus;
   createdAt: string;
+  studentToken: string;
   requestType: { id: string; name: string };
 }
 
@@ -65,6 +66,10 @@ export default function ClassSubmit() {
 
   // Status check state
   const [lookupEmail, setLookupEmail] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [statusResults, setStatusResults] = useState<StatusResult[]>([]);
   const [statusError, setStatusError] = useState("");
   const [statusLoaded, setStatusLoaded] = useState(false);
@@ -99,21 +104,36 @@ export default function ClassSubmit() {
     }
   }
 
-  async function handleStatusCheck(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setStatusError("");
-    setStatusResults([]);
-    setStatusLoaded(false);
+    setSendingOtp(true);
     try {
-      const params = new URLSearchParams({
+      await api.post("/requests/lookup/otp", { courseId: course!.id, studentEmail: lookupEmail });
+      setOtpSent(true);
+    } catch {
+      setStatusError("Failed to send code. Please try again.");
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setStatusError("");
+    setVerifying(true);
+    try {
+      const { data } = await api.post("/requests/lookup/verify", {
         courseId: course!.id,
         studentEmail: lookupEmail,
+        code: otpCode,
       });
-      const { data } = await api.get(`/requests/lookup?${params}`);
       setStatusResults(data);
       setStatusLoaded(true);
     } catch {
-      setStatusError("Failed to look up requests. Please try again.");
+      setStatusError("Invalid or expired code. Please try again.");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -325,26 +345,64 @@ export default function ClassSubmit() {
 
       {mode === "status" && (
         <div>
-          <p className="text-sm text-gray-500">
-            Enter your email to see your submitted requests for this course.
-          </p>
-
-          <form onSubmit={handleStatusCheck} className="mt-4 flex gap-3">
-            <input
-              type="email"
-              value={lookupEmail}
-              onChange={(e) => setLookupEmail(e.target.value)}
-              placeholder="Your email"
-              required
-              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-            >
-              Look Up
-            </button>
-          </form>
+          {!otpSent ? (
+            <>
+              <p className="text-sm text-gray-500">
+                Enter your email and we'll send you a verification code to view your requests.
+              </p>
+              <form onSubmit={handleSendOtp} className="mt-4 flex gap-3">
+                <input
+                  type="email"
+                  value={lookupEmail}
+                  onChange={(e) => setLookupEmail(e.target.value)}
+                  placeholder="Your email"
+                  required
+                  className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={sendingOtp}
+                  className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {sendingOtp ? "Sending..." : "Send Code"}
+                </button>
+              </form>
+            </>
+          ) : !statusLoaded ? (
+            <>
+              <p className="text-sm text-gray-500">
+                Enter the 6-digit code sent to <strong>{lookupEmail}</strong>.
+              </p>
+              <form onSubmit={handleVerifyOtp} className="mt-4 flex gap-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="123456"
+                  required
+                  autoFocus
+                  className="w-36 rounded-md border border-gray-300 px-3 py-2 text-center text-lg font-mono tracking-widest shadow-sm focus:border-gray-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={verifying || otpCode.length !== 6}
+                  className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                >
+                  {verifying ? "Verifying..." : "Verify"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOtpSent(false); setOtpCode(""); setStatusError(""); }}
+                  className="text-sm text-gray-400 hover:text-gray-700"
+                >
+                  Change email
+                </button>
+              </form>
+            </>
+          ) : null}
 
           {statusError && (
             <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -361,9 +419,10 @@ export default function ClassSubmit() {
           {statusResults.length > 0 && (
             <div className="mt-4 space-y-3">
               {statusResults.map((r) => (
-                <div
+                <Link
                   key={r.id}
-                  className="rounded-lg border border-gray-200 p-4"
+                  to={`/request/${r.studentToken}`}
+                  className="block rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:bg-gray-50"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -373,13 +432,11 @@ export default function ClassSubmit() {
                         {new Date(r.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[r.status]}`}
-                    >
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[r.status]}`}>
                       {STATUS_LABELS[r.status]}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

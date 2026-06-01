@@ -3,8 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import { authenticate } from "../middleware/auth";
 import { AuthRequest } from "../types";
 import { sendEmail } from "../services/email";
-import { renderSubmissionConfirmationEmail, renderProfessorReplyEmail } from "../services/emailTemplates";
+import { renderSubmissionConfirmationEmail, renderProfessorReplyEmail, renderOtpEmail } from "../services/emailTemplates";
 import { emitToCourses } from "../services/sseManager";
+import { generateOtp, verifyOtp, hasActiveOtp } from "../services/otpStore";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -64,6 +65,67 @@ router.post("/", async (req: Request, res: Response) => {
     status: request.status,
     studentToken: request.studentToken,
   });
+});
+
+// Public: send OTP to student email for status lookup
+router.post("/lookup/otp", async (req: Request, res: Response) => {
+  const { courseId, studentEmail } = req.body;
+  if (!courseId || !studentEmail) {
+    res.status(400).json({ error: "courseId and studentEmail are required" });
+    return;
+  }
+
+  // Don't spam — if a valid code already exists, don't issue another
+  if (hasActiveOtp(courseId, studentEmail)) {
+    res.json({ sent: true });
+    return;
+  }
+
+  const course = await prisma.course.findUnique({ where: { id: courseId }, select: { name: true } });
+  if (!course) {
+    res.status(404).json({ error: "Course not found" });
+    return;
+  }
+
+  const code = generateOtp(courseId, studentEmail);
+  const { subject, html } = renderOtpEmail({ code, courseName: course.name });
+  sendEmail(studentEmail, subject, html).catch((err) =>
+    console.error("[Email] Failed to send OTP:", err)
+  );
+
+  res.json({ sent: true });
+});
+
+// Public: verify OTP and return requests
+router.post("/lookup/verify", async (req: Request, res: Response) => {
+  const { courseId, studentEmail, code } = req.body;
+  if (!courseId || !studentEmail || !code) {
+    res.status(400).json({ error: "courseId, studentEmail, and code are required" });
+    return;
+  }
+
+  if (!verifyOtp(courseId, studentEmail, code)) {
+    res.status(401).json({ error: "Invalid or expired code" });
+    return;
+  }
+
+  const requests = await prisma.request.findMany({
+    where: {
+      courseId,
+      studentEmail: { equals: studentEmail, mode: "insensitive" },
+    },
+    select: {
+      id: true,
+      subject: true,
+      status: true,
+      createdAt: true,
+      studentToken: true,
+      requestType: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.json(requests);
 });
 
 // Public: student looks up their requests by email + course
